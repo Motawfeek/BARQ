@@ -3,7 +3,7 @@
 // مثل Copilot بالظبط - ذكي، طبيعي، يهزر!
 // ===================================
 
-const GEMINI_API_KEY = 'AIzaSyDrvEGC1ew6q1sBmuSPTfX5JKK_YKpX9cQ';
+const GEMINI_API_KEY = 'AIzaSyDtdF3hYAuAUlynM6ynQYh3kGgs4EbgY5I';
 const GEMINI_MODEL = 'gemini-2.5-flash';
 const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1/models/${GEMINI_MODEL}:generateContent`;
 
