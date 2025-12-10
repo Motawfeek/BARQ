@@ -1,8 +1,8 @@
-
-
-const GEMINI_API_KEY = 'AIzaSyC0c1jV2Nb7Ts6f_lZ3eBYmRFD5Zd8TsB4';
-const GEMINI_MODEL = 'gemini-2.5-flash';
-const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1/models/${GEMINI_MODEL}:generateContent`;
+// DeepSeek configuration (prefer proxy to keep the key private and avoid CORS)
+const DEEPSEEK_API_KEY = 'sk-5efadf16e2424eb1bbf6a04cacd25cd6'; // put on server/proxy, not in frontend for production
+const DEEPSEEK_MODEL = 'deepseek-chat';
+const DEEPSEEK_API_URL = 'https://api.deepseek.com/v1/chat/completions';
+const DEEPSEEK_PROXY_URL = 'http://localhost:3001/deepseek'; // start proxy-server.js locally or point to your hosted proxy
 
 // تخزين المحادثة
 let conversationHistory = [];
@@ -54,32 +54,47 @@ User: ${userMessage}
 You:`;
 
     try {
-        console.log('🚀 Calling Gemini AI...');
-        
-    const response = await fetch(`${GEMINI_API_URL}?key=${GEMINI_API_KEY}`, {
+        console.log('🚀 Calling DeepSeek AI...');
+
+        const endpoint = DEEPSEEK_PROXY_URL || DEEPSEEK_API_URL;
+        const headers = {
+            'Content-Type': 'application/json'
+        };
+        if (!DEEPSEEK_PROXY_URL) {
+            headers['Authorization'] = `Bearer ${DEEPSEEK_API_KEY}`;
+        }
+
+        if (!DEEPSEEK_PROXY_URL && (!DEEPSEEK_API_KEY || DEEPSEEK_API_KEY === 'YOUR_DEEPSEEK_API_KEY')) {
+            console.error('❌ DeepSeek key missing. Set DEEPSEEK_API_KEY or use a proxy that injects it.');
+            return '__FETCH_ERROR__';
+        }
+
+        const response = await fetch(endpoint, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            mode: 'cors',
+            headers,
             body: JSON.stringify({
-                contents: [{
-                    parts: [{ text: systemPrompt }]
-                }],
-                generationConfig: {
-                    temperature: 0.9,
-                    maxOutputTokens: 1200,
-                    topP: 0.95
-                }
-            })
+                model: DEEPSEEK_MODEL,
+                messages: [
+                    { role: 'system', content: 'You are BARQ AI assistant.' },
+                    { role: 'user', content: systemPrompt }
+                ],
+                temperature: 0.9,
+                max_tokens: 1200,
+                top_p: 0.95
+            }),
+            credentials: 'omit'
         });
 
         if (!response.ok) {
             const errorText = await response.text();
             console.error('❌ API Error:', response.status);
             console.error('📄 Error Details:', errorText);
-            return null;
+            return '__API_ERROR__';
         }
 
         const data = await response.json();
-        const aiText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+        const aiText = data.choices?.[0]?.message?.content?.trim();
         
         if (aiText) {
             console.log('✅ AI Response received!');
@@ -100,7 +115,7 @@ You:`;
         
     } catch (error) {
         console.error('❌ Error:', error);
-        return null;
+        return '__FETCH_ERROR__';
     }
 }
 
@@ -138,10 +153,17 @@ async function sendMessage() {
     
     hideTypingIndicator();
     
-    if (response) {
+    if (response && response !== '__API_ERROR__' && response !== '__FETCH_ERROR__') {
         addMessage(response, "bot");
     } else {
-        addMessage('عذراً، حصلت مشكلة مؤقتة 😔\n\nتواصل معنا مباشرة:\n📱 +20 101 143 4111\n📧 barqwork@gmail.com', "bot");
+        let errorHint = 'عذراً، حصلت مشكلة مؤقتة 😔';
+        if (response === '__FETCH_ERROR__') {
+            errorHint += '\n\nتحقق من:\n• تشغيل الموقع عبر http:// أو من خادم محلي (ليس file://)\n• إعداد بروكسي في DEEPSEEK_PROXY_URL لتجاوز CORS\n• اتصال الإنترنت';
+        } else if (response === '__API_ERROR__') {
+            errorHint += '\n\nتحقق من صحة المفتاح والصلاحيات للنموذج deepseek-chat أو استخدم بروكسي.';
+        }
+        errorHint += '\n\nتواصل معنا مباشرة:\n📱 +20 101 143 4111\n📧 barqwork@gmail.com';
+        addMessage(errorHint, "bot");
     }
     
     // iOS scroll fix
@@ -289,18 +311,3 @@ window.addEventListener("load", () => {
 });
 
 console.log('✅ BARQ Smart AI Chat Ready! 🚀');
-
-// Debug: log available models once
-(async function logAvailableModels() {
-    try {
-        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${GEMINI_API_KEY}`);
-        if (!res.ok) {
-            console.error('❌ ListModels error:', res.status);
-            return;
-        }
-        const data = await res.json();
-        console.log('📄 Available models:', data.models?.map(m => m.name));
-    } catch (err) {
-        console.error('❌ list models exception:', err);
-    }
-})();
